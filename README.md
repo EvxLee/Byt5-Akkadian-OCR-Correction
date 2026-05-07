@@ -4,15 +4,18 @@ Fine-tuning `google/byt5-small` to fix OCR errors in ancient Akkadian cuneiform 
 
 ## Running the Pipeline
 
+Steps 1-5 are the same regardless of where you run training.
+
 ```bash
 # 1. Clone the repo
 git clone <this-repo-url> && cd byt5-akkadian-ocr
 
 # 2. Install dependencies
 pip install -r requirements.txt
-brew install tesseract   # macOS — needed for OCR notebook only
+brew install tesseract        # macOS
+# apt-get install tesseract-ocr  # Linux
 
-# 3. Gold data is included in the repo
+# 3. Gold data is already in the repo
 #    data/innaya/   ← Innaya_with_translations_2_2026.csv
 #    data/veenhof/  ← chapter .txt files + PDFs
 #    data/oare/     ← OARE_no-gaps_3-9-26.csv
@@ -21,18 +24,38 @@ brew install tesseract   # macOS — needed for OCR notebook only
 python scripts/generate_synthetic_pairs.py
 # → writes results/synthetic_pairs.jsonl  (~74k pairs)
 
-# 5. Run Tesseract OCR on Veenhof PDFs  [local, no GPU needed]
+# 5. Run Tesseract OCR on Veenhof PDFs
 jupyter notebook notebooks/01_boxes_ocr.ipynb
 # → writes results/ocr_pairs.jsonl
+```
 
-# 6. Copy results/synthetic_pairs.jsonl and results/ocr_pairs.jsonl to your Drive repo folder
-#    (they are gitignored and won't be there automatically)
+### Option A — Local GPU (cleaner, no upload/download)
 
-# 7. Fine-tune ByT5 and evaluate  [Google Colab, T4 GPU, ~2-4 hours]
-#    Upload repo to Google Drive, open notebooks/02_finetune_byt5.ipynb
-#    Set DRIVE_REPO_PATH in the first cell and run all
-# → trains model, prints CER/exact match/chrF++/BLEU vs. baseline inline
-# → writes results/byt5-akkadian/ (checkpoint) + results/model_predictions.txt
+Requires an NVIDIA GPU with CUDA. Results write directly to `results/` — no Drive sync needed.
+
+```bash
+# 6. Open the training notebook from the repo root
+jupyter notebook notebooks/02_finetune_byt5.ipynb
+# Run all cells. The notebook detects it is not on Colab and skips Drive mounting.
+# → trains model, prints metrics inline
+# → writes results/byt5-akkadian/ and results/model_predictions.txt
+```
+
+> **Apple Silicon (MPS):** Open `02_finetune_byt5.ipynb` and change `fp16=True` to `fp16=False` in the training args before running — fp16 is not supported on MPS.
+
+### Option B — Google Colab (free T4 GPU)
+
+```bash
+# 6. Upload the whole repo folder to Google Drive
+#    Also copy results/synthetic_pairs.jsonl and results/ocr_pairs.jsonl into it
+#    (they are gitignored and won't be there from git clone)
+
+# 7. Open notebooks/02_finetune_byt5.ipynb in Colab
+#    Connect to a T4 GPU runtime
+#    Set DRIVE_REPO_PATH in the first cell to match your Drive path
+#    Run all cells (~2-4 hours)
+# → trains model, prints metrics inline
+# → saves results/byt5-akkadian/ and results/model_predictions.txt back to Drive
 ```
 
 ## Dataset Overview
@@ -54,8 +77,8 @@ jupyter notebook notebooks/01_boxes_ocr.ipynb
 
 | Notebook | Runs on | What it does |
 |---|---|---|
-| `01_boxes_ocr.ipynb` | Local | Tesseract OCR on Veenhof PDFs, aligns output to gold lines |
-| `02_finetune_byt5.ipynb` | Colab (GPU) | Loads pairs, tokenizes, fine-tunes ByT5-small, evaluates vs. baseline, saves checkpoint |
+| `01_boxes_ocr.ipynb` | Local (no GPU) | Tesseract OCR on Veenhof PDFs, aligns output to gold lines |
+| `02_finetune_byt5.ipynb` | Local GPU or Colab | Loads pairs, tokenizes, fine-tunes ByT5-small, evaluates vs. baseline, saves checkpoint |
 
 ### Scripts
 
@@ -100,7 +123,7 @@ byt5-akkadian-ocr/
 - Tesseract binary (`brew install tesseract` on macOS, `apt-get install tesseract-ocr` on Linux/Colab)
 - See `requirements.txt` for Python packages
 
-Fine-tuning requires a GPU. The notebook is configured for Google Colab free tier (T4, ~15GB VRAM). `byt5-small` fits comfortably; `byt5-base` is a viable upgrade if compute allows.
+Fine-tuning requires a GPU. `byt5-small` fits in ~6GB VRAM; `byt5-base` is a viable upgrade if compute allows. The training notebook auto-detects whether it is running on Colab or locally and skips Drive mounting accordingly. Apple Silicon users should set `fp16=False` in the training args.
 
 ## Acknowledgements
 
