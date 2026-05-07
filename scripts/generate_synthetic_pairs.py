@@ -22,7 +22,7 @@ from src.parsing.oare_loader import load_oare
 from src.parsing.veenhof_parser import parse_all_chapters
 from src.noise.synthetic import generate_pairs, NOISE_LEVELS
 
-DATA_DIR    = Path("data/gold")
+DATA_DIR    = Path("data")
 OUTPUT_PATH = Path("results/synthetic_pairs.jsonl")
 OUTPUT_PATH.parent.mkdir(exist_ok=True)
 

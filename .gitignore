@@ -10,10 +10,7 @@ build/
 # Jupyter
 .ipynb_checkpoints/
 
-# Data (gold files added manually — not committed)
-data/gold/
-
-# Model checkpoints and results
+# Generated results — not committed (large files, model checkpoints)
 results/
 
 # Secrets / env

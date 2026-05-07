@@ -1,75 +1,117 @@
 # ByT5 Akkadian OCR Correction
 
-Fine-tuning `google/byt5-small` to correct OCR errors in ancient Akkadian cuneiform transliterations. Target use case: cleaning OCR'd output from old academic publications before ingestion into [FactGrid's cuneiform database](https://database.factgrid.de).
+Fine-tuning `google/byt5-small` to fix OCR errors in ancient Akkadian cuneiform transliterations, so digitized academic texts can be ingested into [FactGrid's cuneiform database](https://database.factgrid.de) with fewer manual corrections.
 
-## Repo layout
+## Running the Pipeline
+
+```bash
+# 1. Clone the repo
+git clone <this-repo-url> && cd byt5-akkadian-ocr
+
+# 2. Install dependencies
+pip install -r requirements.txt
+brew install tesseract   # macOS — needed for OCR notebook only
+
+# 3. Gold data is included in the repo
+#    data/innaya/   ← Innaya_with_translations_2_2026.csv
+#    data/veenhof/  ← chapter .txt files + PDFs
+#    data/oare/     ← OARE_no-gaps_3-9-26.csv
+
+# 4. Generate synthetic noisy-gold pairs
+python scripts/generate_synthetic_pairs.py
+# → writes results/synthetic_pairs.jsonl  (~74k pairs)
+
+# 5. Run Tesseract OCR on Veenhof PDFs  [local, no GPU needed]
+jupyter notebook notebooks/01_boxes_ocr.ipynb
+# → writes results/ocr_pairs.jsonl
+
+# 6. Fine-tune ByT5  [Google Colab, T4 GPU, ~2-4 hours]
+#    Upload repo to Google Drive, open notebooks/02_finetune_byt5.ipynb
+#    Set DRIVE_REPO_PATH in the first cell and run all
+# → writes results/byt5-akkadian/ (checkpoint) + results/model_predictions.txt
+
+# 7. Evaluate  [local]
+jupyter notebook notebooks/03_evaluation.ipynb
+# → prints CER, exact match, chrF++, BLEU vs. baseline
+```
+
+## Dataset Overview
+
+- **18,579** unique gold Akkadian lines across **2,007** tablets
+- **74,316** synthetic training pairs generated at 4 noise levels (passthrough / light / medium / heavy)
+- Split **by tablet** (80/10/10 train/val/test) to prevent data leakage
+- Gold data is human-verified transliteration; noisy data is programmatically corrupted to mimic real OCR errors
+
+| Source | Lines | Tablets |
+|---|---|---|
+| Innaya archive | 5,920 | 187 |
+| OARE corpus | 10,536 | 1,562 |
+| Veenhof 2014 | 3,803 | 256 |
+
+## What's Included
+
+### Notebooks
+
+| Notebook | Runs on | What it does |
+|---|---|---|
+| `01_boxes_ocr.ipynb` | Local | Tesseract OCR on Veenhof PDFs, aligns output to gold lines |
+| `02_finetune_byt5.ipynb` | Colab (GPU) | Loads pairs, tokenizes, fine-tunes ByT5-small, saves checkpoint |
+| `03_evaluation.ipynb` | Local | CER, exact match, chrF++, BLEU — model vs. noisy baseline |
+
+### Scripts
+
+- `scripts/generate_synthetic_pairs.py` — corrupts gold lines at multiple noise levels to produce training pairs
+
+### Source Modules (`src/`)
+
+- `parsing/` — loaders for Innaya CSV, OARE CSV, and Veenhof two-column .txt files
+- `noise/` — synthetic OCR noise generator (diacritic stripping, character confusables, drops, swaps)
+- `alignment/` — fuzzy-matches Tesseract output lines to gold lines using rapidfuzz
+- `metrics/` — CER, exact match, chrF++, BLEU
+
+## Project Structure
 
 ```
 byt5-akkadian-ocr/
 ├── data/
-│   ├── gold/
-│   │   ├── innaya/       ← Innaya_with_translations_2_2026.csv
-│   │   ├── veenhof/      ← 14 chapter .txt files + PDFs
-│   │   └── oare/         ← OARE_no-gaps_3-9-26.csv
-│   └── README.md
+│   ├── innaya/        ← Innaya CSV
+│   ├── veenhof/       ← chapter .txt files + PDFs
+│   └── oare/          ← OARE CSV
 ├── notebooks/
-│   ├── 01_boxes_ocr.ipynb     ← Tesseract pipeline
-│   ├── 02_evaluation.ipynb    ← BLEU / chrF++ / CER
-│   └── 03_finetune_byt5.ipynb ← end-to-end training
+│   ├── 01_boxes_ocr.ipynb
+│   ├── 02_finetune_byt5.ipynb
+│   └── 03_evaluation.ipynb
+├── scripts/
+│   └── generate_synthetic_pairs.py
 ├── src/
-│   ├── parsing/         ← loaders for Innaya, OARE, Veenhof
-│   ├── noise/           ← synthetic OCR noise generator
-│   ├── alignment/       ← Tesseract output → gold line matching
-│   └── metrics/         ← CER, exact match, chrF++, BLEU
-└── results/             ← checkpoints, eval logs (gitignored)
+│   ├── parsing/
+│   ├── noise/
+│   ├── alignment/
+│   └── metrics/
+└── results/               ← generated files, gitignored
+    ├── synthetic_pairs.jsonl
+    ├── ocr_pairs.jsonl
+    ├── test_pairs.jsonl
+    ├── model_predictions.txt
+    └── byt5-akkadian/     ← model checkpoint
 ```
 
-## Roadmap
+## Requirements
 
-### Stage 1 — Data ingestion (unblocker)
-- [ ] Drop gold files into `data/gold/{innaya,veenhof,oare}/`
-- [ ] Verify `src/parsing/innaya_loader.py` on the Innaya CSV
-- [ ] Run `src/parsing/veenhof_parser.py` on the 14 chapter .txt files; audit output for false positives (English prose leaking in) and missed Akkadian lines
-- [ ] Verify `src/parsing/oare_loader.py` -- check actual column names in OARE CSV and adjust `AKKADIAN_COL` constant if needed
-- [ ] Pool all three sources into one DataFrame; deduplicate on `akkadian_gold`
+- Python 3.10+
+- Tesseract binary (`brew install tesseract` on macOS, `apt-get install tesseract-ocr` on Linux/Colab)
+- See `requirements.txt` for Python packages
 
-### Stage 2 — Noise generation
-- [ ] **Synthetic (fast, do this first):** `src/noise/synthetic.py` is ready. Run `generate_pairs()` on all gold lines; inspect ~50 pairs to confirm the noise looks realistic
-- [ ] Tune `diacritic_rate` (currently 0.6) if the synthetic noise is too aggressive or too mild compared to real Tesseract output
-- [ ] **Tesseract (optional, adds structural errors):** run `notebooks/01_boxes_ocr.ipynb` on the Veenhof PDFs; check alignment yield -- if below ~50%, the PDF layout may need tuning
+Fine-tuning requires a GPU. The notebook is configured for Google Colab free tier (T4, ~15GB VRAM). `byt5-small` fits comfortably; `byt5-base` is a viable upgrade if compute allows.
 
-### Stage 3 — Train/val/test split
-- [ ] Split **by tablet ID**, not by line (already wired in `03_finetune_byt5.ipynb`)
-- [ ] Confirm no tablet leaks across splits
+## Acknowledgements
 
-### Stage 4 — Fine-tuning
-- [ ] Upload repo (or just `src/` + `notebooks/03_finetune_byt5.ipynb`) to Colab
-- [ ] Mount Drive or upload gold CSVs/txts directly
-- [ ] Run the training cell; ~5 epochs on T4 should take 1-3 hours depending on dataset size
-- [ ] Save best checkpoint to Drive
+Gold data is drawn from three scholarly sources:
 
-### Stage 5 — Evaluation
-- [ ] Run `notebooks/02_evaluation.ipynb` on the held-out test set
-- [ ] **Compute baseline first** (noisy input vs gold, no model). Model must beat this to be useful.
-- [ ] Report CER, exact match, chrF++, BLEU
+**Innaya archive** — Old Assyrian merchant correspondence from the Innaya archive, Kültepe (ancient Kanesh). Approximately 250 tablets, ~5,920 transliteration lines.
 
-## Install (local dev / testing)
+**OARE corpus** — Open Access Research on the Euphrates. A curated no-gaps corpus of Old Assyrian tablet transliterations. Approximately 1,560 tablets across multiple collections.
 
-```bash
-pip install -r requirements.txt
-```
+**Veenhof 2014** — Veenhof, K.R. *Kültepe Tabletleri VIII: The Archive of Elamma son of Iddin-Suen and his Family.* Türk Tarih Kurumu, Ankara, 2014. The Elamma family archive, ~240 tablets, used here with the permission embedded in its academic publication context.
 
-Tesseract binary also needed for OCR notebook:
-```bash
-# macOS
-brew install tesseract
-# Ubuntu / Colab
-apt-get install tesseract-ocr
-```
-
-## Key design decisions
-
-- **Byte-level model (ByT5):** sidesteps tokenizer-vocabulary problems with Akkadian diacritics (`ā`, `š`, `ṣ`, `ḫ`, etc.)
-- **Split by tablet, not line:** lines from the same tablet share vocabulary; line-level split leaks data
-- **Synthetic noise as primary path:** Tesseract alignment is supplemental -- synthetic pairs are faster to generate and fully controllable
-- **CER is the primary metric:** it's the most informative for character-level OCR correction tasks
+All transliterations are the work of the original scholars. This project applies machine learning to assist in digitization; it does not claim authorship of the underlying philological work.
