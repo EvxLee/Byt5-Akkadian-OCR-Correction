@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data (gold files added manually — not committed)
+data/gold/
+
+# Model checkpoints and results
+results/
+
+# Secrets / env
+.env
+
+# macOS
+.DS_Store
