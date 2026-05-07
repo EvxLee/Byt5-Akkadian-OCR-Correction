@@ -25,14 +25,14 @@ python scripts/generate_synthetic_pairs.py
 jupyter notebook notebooks/01_boxes_ocr.ipynb
 # → writes results/ocr_pairs.jsonl
 
-# 6. Fine-tune ByT5  [Google Colab, T4 GPU, ~2-4 hours]
+# 6. Copy results/synthetic_pairs.jsonl and results/ocr_pairs.jsonl to your Drive repo folder
+#    (they are gitignored and won't be there automatically)
+
+# 7. Fine-tune ByT5 and evaluate  [Google Colab, T4 GPU, ~2-4 hours]
 #    Upload repo to Google Drive, open notebooks/02_finetune_byt5.ipynb
 #    Set DRIVE_REPO_PATH in the first cell and run all
+# → trains model, prints CER/exact match/chrF++/BLEU vs. baseline inline
 # → writes results/byt5-akkadian/ (checkpoint) + results/model_predictions.txt
-
-# 7. Evaluate  [local]
-jupyter notebook notebooks/03_evaluation.ipynb
-# → prints CER, exact match, chrF++, BLEU vs. baseline
 ```
 
 ## Dataset Overview
@@ -55,8 +55,7 @@ jupyter notebook notebooks/03_evaluation.ipynb
 | Notebook | Runs on | What it does |
 |---|---|---|
 | `01_boxes_ocr.ipynb` | Local | Tesseract OCR on Veenhof PDFs, aligns output to gold lines |
-| `02_finetune_byt5.ipynb` | Colab (GPU) | Loads pairs, tokenizes, fine-tunes ByT5-small, saves checkpoint |
-| `03_evaluation.ipynb` | Local | CER, exact match, chrF++, BLEU — model vs. noisy baseline |
+| `02_finetune_byt5.ipynb` | Colab (GPU) | Loads pairs, tokenizes, fine-tunes ByT5-small, evaluates vs. baseline, saves checkpoint |
 
 ### Scripts
 
@@ -79,8 +78,7 @@ byt5-akkadian-ocr/
 │   └── oare/          ← OARE CSV
 ├── notebooks/
 │   ├── 01_boxes_ocr.ipynb
-│   ├── 02_finetune_byt5.ipynb
-│   └── 03_evaluation.ipynb
+│   └── 02_finetune_byt5.ipynb
 ├── scripts/
 │   └── generate_synthetic_pairs.py
 ├── src/
