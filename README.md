@@ -43,20 +43,21 @@ jupyter notebook notebooks/02_finetune_byt5.ipynb
 
 > **Apple Silicon (MPS):** Open `02_finetune_byt5.ipynb` and change `fp16=True` to `fp16=False` in the training args before running — fp16 is not supported on MPS.
 
-### Option B — Google Colab (free T4 GPU)
+### Option B — Google Colab
 
-```bash
-# 6. Upload the whole repo folder to Google Drive
-#    Also copy results/synthetic_pairs.jsonl and results/ocr_pairs.jsonl into it
-#    (they are gitignored and won't be there from git clone)
-
-# 7. Open notebooks/02_finetune_byt5.ipynb in Colab
-#    Connect to a T4 GPU runtime
-#    Set DRIVE_REPO_PATH in the first cell to match your Drive path
-#    Run all cells (~2-4 hours)
-# → trains model, prints metrics inline
-# → saves results/byt5-akkadian/ and results/model_predictions.txt back to Drive
 ```
+1. Open notebooks/02_finetune_byt5.ipynb in Colab
+2. Connect an L4 or T4 GPU runtime (L4 recommended on Colab Pro)
+3. Paste your GitHub repo URL into GITHUB_REPO_URL in the first cell
+4. Run the first cell — the repo clones automatically
+5. Upload results/synthetic_pairs.jsonl and results/ocr_pairs.jsonl via the
+   Colab file sidebar (folder icon on the left) into the results/ folder
+6. Run remaining cells (~2-4 hours on T4, ~1 hour on L4)
+→ trains model, prints metrics inline
+→ writes results/byt5-akkadian/ and results/model_predictions.txt inside the session
+```
+
+Note: Colab sessions are temporary. Download `results/byt5-akkadian/` before the session ends if you want to keep the checkpoint.
 
 ## Dataset Overview
 

@@ -10,7 +10,7 @@ build/
 # Jupyter
 .ipynb_checkpoints/
 
-# Generated results — not committed (large files, model checkpoints)
+# Generated results — not committed (processed data, model checkpoints)
 results/
 
 # Secrets / env
