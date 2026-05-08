@@ -21,11 +21,11 @@ brew install tesseract        # macOS
 #    data/oare/     ← OARE_no-gaps_3-9-26.csv
 
 # 4. Generate synthetic noisy-gold pairs
-python scripts/generate_synthetic_pairs.py
+python notebooks/generate_synthetic_pairs.py
 # → writes results/synthetic_pairs.jsonl  (~74k pairs)
 
 # 5. Run Tesseract OCR on Veenhof PDFs
-jupyter notebook notebooks/01_boxes_ocr.ipynb
+jupyter notebook notebooks/boxes_ocr.ipynb
 # → writes results/ocr_pairs.jsonl
 ```
 
@@ -35,18 +35,18 @@ Requires an NVIDIA GPU with CUDA. Results write directly to `results/` — no Dr
 
 ```bash
 # 6. Open the training notebook from the repo root
-jupyter notebook notebooks/02_finetune_byt5.ipynb
+jupyter notebook notebooks/finetune_byt5.ipynb
 # Run all cells. The notebook detects it is not on Colab and skips Drive mounting.
 # → trains model, prints metrics inline
 # → writes results/byt5-akkadian/ and results/model_predictions.txt
 ```
 
-> **Apple Silicon (MPS):** Open `02_finetune_byt5.ipynb` and change `fp16=True` to `fp16=False` in the training args before running — fp16 is not supported on MPS.
+> **Apple Silicon (MPS):** Open `finetune_byt5.ipynb` and change `fp16=True` to `fp16=False` in the training args before running — fp16 is not supported on MPS.
 
 ### Option B — Google Colab
 
 ```
-1. Open notebooks/02_finetune_byt5.ipynb in Colab
+1. Open notebooks/finetune_byt5.ipynb in Colab
 2. Connect an L4 or T4 GPU runtime (L4 recommended on Colab Pro)
 3. Paste your GitHub repo URL into GITHUB_REPO_URL in the first cell
 4. Run the first cell — the repo clones automatically
@@ -76,14 +76,11 @@ Note: Colab sessions are temporary. Download `results/byt5-akkadian/` before the
 
 ### Notebooks
 
-| Notebook | Runs on | What it does |
+| Notebook / Script | Runs on | What it does |
 |---|---|---|
-| `01_boxes_ocr.ipynb` | Local (no GPU) | Tesseract OCR on Veenhof PDFs, aligns output to gold lines |
-| `02_finetune_byt5.ipynb` | Local GPU or Colab | Loads pairs, tokenizes, fine-tunes ByT5-small, evaluates vs. baseline, saves checkpoint |
-
-### Scripts
-
-- `scripts/generate_synthetic_pairs.py` — corrupts gold lines at multiple noise levels to produce training pairs
+| `boxes_ocr.ipynb` | Local (no GPU) | Tesseract OCR on Veenhof PDFs, aligns output to gold lines |
+| `finetune_byt5.ipynb` | Local GPU or Colab | Loads pairs, tokenizes, fine-tunes ByT5-small, evaluates vs. baseline, saves checkpoint |
+| `generate_synthetic_pairs.py` | Local | Corrupts gold lines at multiple noise levels to produce training pairs |
 
 ### Source Modules (`src/`)
 
@@ -101,9 +98,8 @@ byt5-akkadian-ocr/
 │   ├── veenhof/       ← chapter .txt files + PDFs
 │   └── oare/          ← OARE CSV
 ├── notebooks/
-│   ├── 01_boxes_ocr.ipynb
-│   └── 02_finetune_byt5.ipynb
-├── scripts/
+│   ├── boxes_ocr.ipynb
+│   ├── finetune_byt5.ipynb
 │   └── generate_synthetic_pairs.py
 ├── src/
 │   ├── parsing/

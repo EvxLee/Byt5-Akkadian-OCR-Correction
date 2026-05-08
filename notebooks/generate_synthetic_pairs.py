@@ -5,7 +5,7 @@ Produces results/synthetic_pairs.jsonl — one JSON object per line:
   {"noisy": "...", "gold": "...", "level": "medium", "source": "innaya", "tablet_id": "..."}
 
 Run from the repo root:
-  python scripts/generate_synthetic_pairs.py
+  python notebooks/generate_synthetic_pairs.py
 """
 
 import json
