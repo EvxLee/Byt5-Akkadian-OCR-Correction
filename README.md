@@ -2,13 +2,28 @@
 
 Fine-tuning `google/byt5-small` to fix OCR errors in ancient Akkadian cuneiform transliterations, so digitized academic texts can be ingested into [FactGrid's cuneiform database](https://database.factgrid.de) with fewer manual corrections.
 
+**[Full Project Report and Findings →](https://app.notion.com/p/Byt5-Akkadian-OCR-Correction-Report-375a5f597a88806a8084cda056e7f6a4?source=copy_link)**
+
+---
+
+## Results
+
+| Metric | Baseline (no model) | ByT5-small fine-tuned |
+|---|---|---|
+| Exact match | 0.366 | **0.724** |
+| CER (lower = better) | 0.066 | **0.017** |
+| chrF++ | 76.94 | **95.40** |
+| BLEU | 62.17 | **90.32** |
+
+---
+
 ## Running the Pipeline
 
-Steps 1-5 are the same regardless of where you run training.
+The full pipeline takes **2-3 hours** end to end. Steps 1-5 run locally (no GPU needed). Step 6 requires a GPU.
 
 ```bash
 # 1. Clone the repo
-git clone <this-repo-url> && cd byt5-akkadian-ocr
+git clone <this-repo-url> && cd Byt5-Akkadian-OCR-Correction
 
 # 2. Install dependencies
 pip install -r requirements.txt
@@ -20,51 +35,62 @@ brew install tesseract        # macOS
 #    data/veenhof/  ← chapter .txt files + PDFs
 #    data/oare/     ← OARE_no-gaps_3-9-26.csv
 
-# 4. Generate synthetic noisy-gold pairs
+# 4. Generate synthetic noisy-gold pairs  (~2 min)
 python notebooks/generate_synthetic_pairs.py
 # → writes results/synthetic_pairs.jsonl  (~74k pairs)
 
-# 5. Run Tesseract OCR on Veenhof PDFs
+# 5. Run Tesseract OCR on Veenhof PDFs  (~20 min)
 jupyter notebook notebooks/boxes_ocr.ipynb
 # → writes results/ocr_pairs.jsonl
 ```
 
-### Option A — Local GPU (cleaner, no upload/download)
+### Option A — Google Colab (recommended)
 
-Requires an NVIDIA GPU with CUDA. Results write directly to `results/` — no Drive sync needed.
+**Use an A100 GPU with High RAM runtime** — training takes ~1.5 hours. T4 works but takes ~3 hours.
+
+> **Important:** After connecting the runtime, verify the GPU is live before running anything:
+> ```python
+> import torch
+> print(torch.cuda.is_available())       # must be True
+> print(torch.cuda.get_device_name(0))   # should say A100
+> ```
+> If `False`, disconnect the runtime and reconnect — Colab sometimes attaches a session without initializing the GPU.
+
+```
+1. Open notebooks/finetune_byt5.ipynb in Colab
+2. Select Runtime → Change runtime type → A100 GPU, High RAM
+3. Paste your GitHub repo URL into GITHUB_REPO_URL in the Setup cell
+4. Run the Setup cell — the repo clones automatically
+5. Run the Upload cell — click "Choose Files" and select both:
+     results/synthetic_pairs.jsonl
+     results/ocr_pairs.jsonl
+6. Run all remaining cells
+   → trains model, prints metrics inline (~1.5 hrs on A100)
+   → writes results/byt5-akkadian/ checkpoint to the Colab session
+```
+
+> **Save your checkpoint** before the session ends — Colab sessions are temporary. Download `results/byt5-akkadian/` from the file sidebar.
+
+### Option B — Local GPU
+
+Requires an NVIDIA GPU with CUDA. Results write directly to `results/` — no upload needed.
 
 ```bash
-# 6. Open the training notebook from the repo root
+# From the repo root:
 jupyter notebook notebooks/finetune_byt5.ipynb
-# Run all cells. The notebook detects it is not on Colab and skips Drive mounting.
+# Run all cells — the notebook detects it is not on Colab and skips file upload.
 # → trains model, prints metrics inline
 # → writes results/byt5-akkadian/ and results/model_predictions.txt
 ```
 
-> **Apple Silicon (MPS):** Open `finetune_byt5.ipynb` and change `fp16=True` to `fp16=False` in the training args before running — fp16 is not supported on MPS.
-
-### Option B — Google Colab
-
-```
-1. Open notebooks/finetune_byt5.ipynb in Colab
-2. Connect an L4 or T4 GPU runtime (L4 recommended on Colab Pro)
-3. Paste your GitHub repo URL into GITHUB_REPO_URL in the first cell
-4. Run the first cell — the repo clones automatically
-5. Upload results/synthetic_pairs.jsonl and results/ocr_pairs.jsonl via the
-   Colab file sidebar (folder icon on the left) into the results/ folder
-6. Run remaining cells (~2-4 hours on T4, ~1 hour on L4)
-→ trains model, prints metrics inline
-→ writes results/byt5-akkadian/ and results/model_predictions.txt inside the session
-```
-
-Note: Colab sessions are temporary. Download `results/byt5-akkadian/` before the session ends if you want to keep the checkpoint.
+---
 
 ## Dataset Overview
 
-- **18,579** unique gold Akkadian lines across **2,007** tablets
-- **74,316** synthetic training pairs generated at 4 noise levels (passthrough / light / medium / heavy)
+- **18,579** unique gold Akkadian lines across **2,005** tablets
+- **74,316** synthetic training pairs at 4 noise levels (passthrough / light / medium / heavy)
+- **2,671** real OCR pairs from Tesseract on Veenhof PDFs
 - Split **by tablet** (80/10/10 train/val/test) to prevent data leakage
-- Gold data is human-verified transliteration; noisy data is programmatically corrupted to mimic real OCR errors
 
 | Source | Lines | Tablets |
 |---|---|---|
@@ -72,27 +98,29 @@ Note: Colab sessions are temporary. Download `results/byt5-akkadian/` before the
 | OARE corpus | 10,536 | 1,562 |
 | Veenhof 2014 | 3,803 | 256 |
 
+---
+
 ## What's Included
 
-### Notebooks
-
-| Notebook / Script | Runs on | What it does |
+| File | Runs on | What it does |
 |---|---|---|
-| `boxes_ocr.ipynb` | Local (no GPU) | Tesseract OCR on Veenhof PDFs, aligns output to gold lines |
-| `finetune_byt5.ipynb` | Local GPU or Colab | Loads pairs, tokenizes, fine-tunes ByT5-small, evaluates vs. baseline, saves checkpoint |
-| `generate_synthetic_pairs.py` | Local | Corrupts gold lines at multiple noise levels to produce training pairs |
+| `notebooks/generate_synthetic_pairs.py` | Local | Corrupts gold lines at 4 noise levels to produce training pairs |
+| `notebooks/boxes_ocr.ipynb` | Local (no GPU) | Tesseract OCR on Veenhof PDFs, aligns to gold lines |
+| `notebooks/finetune_byt5.ipynb` | Colab A100 or local GPU | Tokenizes, trains, evaluates, saves checkpoint |
 
 ### Source Modules (`src/`)
 
 - `parsing/` — loaders for Innaya CSV, OARE CSV, and Veenhof two-column .txt files
-- `noise/` — synthetic OCR noise generator (diacritic stripping, character confusables, drops, swaps)
+- `noise/` — synthetic OCR noise generator (diacritic stripping, confusables, drops, swaps)
 - `alignment/` — fuzzy-matches Tesseract output lines to gold lines using rapidfuzz
 - `metrics/` — CER, exact match, chrF++, BLEU
+
+---
 
 ## Project Structure
 
 ```
-byt5-akkadian-ocr/
+Byt5-Akkadian-OCR-Correction/
 ├── data/
 │   ├── innaya/        ← Innaya CSV
 │   ├── veenhof/       ← chapter .txt files + PDFs
@@ -114,13 +142,16 @@ byt5-akkadian-ocr/
     └── byt5-akkadian/     ← model checkpoint
 ```
 
+---
+
 ## Requirements
 
 - Python 3.10+
-- Tesseract binary (`brew install tesseract` on macOS, `apt-get install tesseract-ocr` on Linux/Colab)
+- Tesseract binary (`brew install tesseract` on macOS, `apt-get install tesseract-ocr` on Linux)
 - See `requirements.txt` for Python packages
+- GPU for fine-tuning: A100 recommended (80GB VRAM), T4 minimum (15GB)
 
-Fine-tuning requires a GPU. `byt5-small` fits in ~6GB VRAM; `byt5-base` is a viable upgrade if compute allows. The training notebook auto-detects whether it is running on Colab or locally and skips Drive mounting accordingly. Apple Silicon users should set `fp16=False` in the training args.
+---
 
 ## Acknowledgements
 
